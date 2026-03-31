@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SG Payment Dashboard - 260331</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-base: #E8EEF5;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --accent: #38bdf8;
+            --ogk-dark: #041527;
+            --ogk-navy: #002D4B;
+            --ogk-cyan: #009AB8;
+            --ogk-lime: #B8D544;
+            --glass-bg: rgba(255, 255, 255, 0.45);
+            --glass-bg-inner: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.8);
+            --glass-border-inner: rgba(255, 255, 255, 0.6);
+            --glass-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+            --blur: blur(20px);
+            --glow-cyan: 0 0 20px rgba(0, 154, 184, 0.15);
+            --glow-lime: 0 0 20px rgba(184, 213, 68, 0.15);
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-base);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        /* Animated Background Blobs */
+        .blob-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.6;
+            animation: float 20s infinite ease-in-out alternate;
+        }
+
+        .blob-navy { background: var(--ogk-navy); width: 50vw; height: 50vw; top: -10%; left: -5%; animation-delay: -2s; }
+        .blob-cyan { background: var(--ogk-cyan); width: 40vw; height: 40vw; bottom: -10%; right: -5%; animation-delay: -5s; }
+        .blob-lime { background: var(--ogk-lime); width: 30vw; height: 30vw; top: 20%; right: 15%; opacity: 0.4; animation-delay: -8s; }
+        .blob-accent { background: var(--accent); width: 35vw; height: 35vw; bottom: 10%; left: 20%; opacity: 0.5; animation-delay: -12s; }
+
+        @keyframes float {
+            0%   { transform: translate(0, 0) scale(1); }
+            50%  { transform: translate(5%, 5%) scale(1.1); }
+            100% { transform: translate(-5%, -5%) scale(0.9); }
+        }
+
+        /* Main Container */
+        .container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, rgba(4, 21, 39, 0.92), rgba(0, 45, 75, 0.88));
+            backdrop-filter: var(--blur);
+            border-bottom: 1px solid rgba(0, 154, 184, 0.2);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-img {
+            height: 40px;
+            object-fit: contain;
+        }
+
+        .date-badge {
+            background: rgba(0, 154, 184, 0.15);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 154, 184, 0.25);
+            letter-spacing: 0.02em;
+        }
+
+        .upload-btn {
+            padding: 9px 18px;
+            background: rgba(0, 154, 184, 0.2);
+            color: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(0, 154, 184, 0.35);
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(8px);
+        }
+
+        .upload-btn:hover {
+            background: rgba(0, 154, 184, 0.35);
+            border-color: var(--ogk-cyan);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(0, 154, 184, 0.2);
+        }
+
+        .hidden-file-input { display: none; }
+
+        .title-section {
+            padding: 18px 32px 12px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .title-main {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--ogk-dark);
+            margin-bottom: 2px;
+            letter-spacing: -0.01em;
+        }
+
+        .title-sub {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .file-input-label {
+            font-size: 13px;
+            color: var(--text-main);
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        /* Tabs */
+        .tabs-container {
+            display: flex;
+            gap: 4px;
+            padding: 0 32px;
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: var(--blur);
+            border-bottom: 1px solid var(--glass-border-inner);
+            position: relative;
+            z-index: 10;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            transition: all 0.3s ease;
+            position: relative;
+            white-space: nowrap;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .tab.active {
+            color: var(--ogk-navy);
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 8px;
+            right: 8px;
+            height: 2.5px;
+            background: linear-gradient(90deg, var(--ogk-cyan), var(--ogk-lime));
+            border-radius: 2px 2px 0 0;
+        }
+
+        .tab:hover:not(.active) {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Content Area */
+        .content-wrapper {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .tab-content {
+            width: 100%;
+            height: 100%;
+            display: none;
+            overflow-y: auto;
+            padding: 32px;
+            gap: 24px;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* KPI Cards */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--glass-bg-inner);
+            backdrop-filter: var(--blur);
+            border: 1px solid var(--glass-border-inner);
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: var(--glass-shadow);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--ogk-cyan), var(--ogk-lime));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--glass-shadow), var(--glow-cyan);
+            border-color: rgba(0, 154, 184, 0.3);
+        }
+
+        .kpi-card:hover::before {
+            opacity: 1;
+        }
+
+        .kpi-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .kpi-label-kr {
+            display: block;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .kpi-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--ogk-navy);
+            margin-bottom: 4px;
+        }
+
+        .kpi-unit {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Charts Container */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 24px;
+            margin-bottom: 24px;
+            min-height: 350px;
+        }
+
+        .chart-card {
+            background: var(--glass-bg-inner);
+            backdrop-filter: var(--blur);
+            border: 1px solid var(--glass-border-inner);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: var(--glass-shadow);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .chart-card:hover {
+            box-shadow: var(--glass-shadow), var(--glow-cyan);
+            border-color: rgba(0, 154, 184, 0.25);
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ogk-navy);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chart-title-kr {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+            font-weight: 400;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 280px;
+            width: 100%;
+        }
+
+        /* Tables */
+        .table-container {
+            background: var(--glass-bg-inner);
+            backdrop-filter: var(--blur);
+            border: 1px solid var(--glass-border-inner);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: var(--glass-shadow);
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .table-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ogk-navy);
+        }
+
+        .table-title-kr {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+            font-weight: 400;
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            border: 1px solid var(--glass-border-inner);
+            background: rgba(255, 255, 255, 0.6);
+            color: var(--text-main);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-small:hover {
+            background: white;
+            border-color: var(--ogk-cyan);
+            color: var(--ogk-cyan);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            background: linear-gradient(135deg, var(--ogk-dark), var(--ogk-navy));
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            padding: 11px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+            letter-spacing: 0.01em;
+        }
+
+        th:hover {
+            background: rgba(0, 154, 184, 0.2);
+        }
+
+        th.sortable::after {
+            content: '';
+            margin-left: 6px;
+            display: inline-block;
+        }
+
+        th.sort-asc::after {
+            content: '▲';
+            font-size: 10px;
+        }
+
+        th.sort-desc::after {
+            content: '▼';
+            font-size: 10px;
+        }
+
+        td {
+            padding: 9px 12px;
+            border-bottom: 1px solid rgba(0, 45, 75, 0.06);
+            font-size: 13px;
+        }
+
+        tbody tr:nth-child(odd) {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        tbody tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        tbody tr:hover {
+            background: rgba(0, 154, 184, 0.08);
+        }
+
+        /* Filter Row */
+        .filter-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        select, .search-box {
+            padding: 8px 12px;
+            border: 1px solid var(--glass-border-inner);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.7);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            min-width: 150px;
+        }
+
+        select:focus, .search-box:focus {
+            outline: none;
+            border-color: var(--ogk-cyan);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(0, 154, 184, 0.1);
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .pagination-info {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .pagination-btn {
+            width: 32px;
+            height: 32px;
+            border: 1px solid var(--glass-border-inner);
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            color: var(--text-main);
+            font-size: 0;
+        }
+
+        .pagination-btn .material-icons-round {
+            font-size: 20px;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: white;
+            border-color: var(--ogk-cyan);
+            color: var(--ogk-cyan);
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Drag & Drop Overlay */
+        .drop-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(4, 21, 39, 0.85);
+            backdrop-filter: blur(24px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            font-size: 0;
+        }
+
+        .drop-overlay.active {
+            display: flex;
+            font-size: 1rem;
+        }
+
+        .drop-zone {
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px dashed rgba(0, 154, 184, 0.5);
+            border-radius: 24px;
+            padding: 56px 64px;
+            text-align: center;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .drop-overlay.active .drop-zone {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.03);
+            border-color: var(--ogk-cyan);
+            box-shadow: 0 0 40px rgba(0, 154, 184, 0.15);
+        }
+
+        .drop-icon {
+            font-size: 52px;
+            color: var(--ogk-cyan);
+            margin-bottom: 16px;
+        }
+
+        .drop-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: white;
+        }
+
+        .drop-text-kr {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 4px;
+        }
+
+        /* Color Coding */
+        .rate-green { background: rgba(34, 197, 94, 0.2); color: #15803d; }
+        .rate-yellow { background: rgba(202, 138, 4, 0.2); color: #a16207; }
+        .rate-red { background: rgba(220, 38, 38, 0.2); color: #b91c1c; }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 24px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 56px;
+            margin-bottom: 20px;
+            opacity: 0.35;
+            color: var(--ogk-cyan);
+        }
+
+        .empty-text {
+            font-size: 16px;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .empty-hint {
+            font-size: 13px;
+            opacity: 0.6;
+        }
+
+        /* Responsive */
+        @media (max-width: 1400px) {
+            .kpi-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .charts-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                align-items: flex-start;
+            }
+            .kpi-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .tab-content {
+                padding: 16px;
+            }
+        }
+
+        .currency {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Blobs -->
+    <div class="blob-bg">
+        <div class="blob blob-navy"></div>
+        <div class="blob blob-cyan"></div>
+        <div class="blob blob-lime"></div>
+        <div class="blob blob-accent"></div>
+    </div>
+
+    <!-- Drop Overlay -->
+    <div class="drop-overlay" id="dropOverlay">
+        <div class="drop-zone">
+            <div class="drop-icon material-icons-round">cloud_upload</div>
+            <div class="drop-text">Drop Excel File Here</div>
+            <div class="drop-text-kr">엑셀 파일을 여기에 놓으세요</div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <img id="logoImg" src="" alt="OGK KOREA" class="logo-img">
+                <span class="date-badge" id="dateBadge">데이터 로드 대기중...</span>
+            </div>
+            <label class="upload-btn" style="margin: 0;">
+                <span class="material-icons-round" style="font-size: 20px;">upload_file</span>
+                <span>파일 불러오기</span>
+                <input type="file" id="fileInput" class="hidden-file-input" accept=".xlsx,.xls" onchange="handleFileSelect(event)">
+            </label>
+        </div>
+
+        <div class="title-section">
+            <h1 class="title-main">SG사업부 수금현황</h1>
+            <p class="title-sub">Payment Collection Dashboard</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs-container">
+            <button class="tab active" onclick="switchTab(0)">
+                <span>개요 Overview</span>
+            </button>
+            <button class="tab" onclick="switchTab(1)">
+                <span>브랜드현황 Brand Status</span>
+            </button>
+            <button class="tab" onclick="switchTab(2)">
+                <span>상세데이터 Detail Data</span>
+            </button>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content-wrapper">
+            <!-- Tab 1: Overview -->
+            <div class="tab-content active">
+                <div class="empty-state" id="tab1-empty">
+                    <div class="empty-icon material-icons-round">cloud_upload</div>
+                    <div class="empty-text">수금데이터를 드래그하세요</div>
+                    <div class="empty-hint">또는 '파일 불러오기' 버튼을 클릭하세요</div>
+                </div>
+                <div id="tab1-content" style="display: none;">
+                    <!-- 상단: KPI Cards -->
+                    <div class="kpi-row" id="kpiRow"></div>
+
+                    <!-- 중단: Charts -->
+                    <div class="charts-row">
+                        <div class="chart-card">
+                            <div class="chart-title">
+                                Aging Distribution
+                                <div class="chart-title-kr">회수기간별 분포</div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="agingChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">
+                                Top Brands
+                                <div class="chart-title-kr">상위 브랜드 미수금</div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="brandsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 하단: Invoice Table -->
+                    <div class="table-container">
+                        <div class="table-header">
+                            <div>
+                                <div class="table-title">
+                                    Invoice List
+                                    <div class="table-title-kr" id="invoiceTableTitle">인보이스 현황</div>
+                                </div>
+                            </div>
+                            <div class="table-actions">
+                                <button class="btn-small" onclick="clearOverviewFilter()">
+                                    <span class="material-icons-round" style="font-size: 14px;">clear</span>
+                                    <span>Clear Filter</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table id="overviewTable">
+                                <thead>
+                                    <tr>
+                                        <th>Brand 브랜드</th>
+                                        <th>Invoice# 인보이스</th>
+                                        <th>Ship To 납품처</th>
+                                        <th style="text-align: right;">Aging 회수일</th>
+                                        <th style="text-align: right;">Amount 청구액</th>
+                                        <th style="text-align: right;">Balance 미수금</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="overviewTableBody"></tbody>
+                            </table>
+                        </div>
+                        <div id="overviewShowAll" style="text-align: center; padding: 12px; display: none;">
+                            <button class="btn-small" onclick="toggleShowAllOverviewInvoices()">
+                                <span class="material-icons-round" style="font-size: 14px;">expand_more</span>
+                                <span>Show All</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Brand Status -->
+            <div class="tab-content">
+                <div class="empty-state" id="tab2-empty">
+                    <div class="empty-icon material-icons-round">cloud_upload</div>
+                    <div class="empty-text">수금데이터를 드래그하세요</div>
+                    <div class="empty-hint">또는 '파일 불러오기' 버튼을 클릭하세요</div>
+                </div>
+                <div id="tab2-content" style="display: none;" class="table-container">
+                    <div style="overflow-x: auto;">
+                        <table id="brandTable">
+                            <thead>
+                                <tr>
+                                    <th class="sortable">Brand 브랜드</th>
+                                    <th class="sortable" style="text-align: right;">Total Invoiced 청구액</th>
+                                    <th class="sortable" style="text-align: right;">Total Paid 수금액</th>
+                                    <th class="sortable" style="text-align: right;">Outstanding 미수금</th>
+                                    <th class="sortable" style="text-align: right;">60+ Days 연체금</th>
+                                    <th class="sortable" style="text-align: right;">Collection Rate 수금율</th>
+                                    <th class="sortable" style="text-align: right;">Avg Aging 평균일수</th>
+                                    <th class="sortable" style="text-align: right;">Invoice Count 인보이스 수</th>
+                                </tr>
+                            </thead>
+                            <tbody id="brandTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Detail Data -->
+            <div class="tab-content">
+                <div class="empty-state" id="tab3-empty">
+                    <div class="empty-icon material-icons-round">cloud_upload</div>
+                    <div class="empty-text">수금데이터를 드래그하세요</div>
+                    <div class="empty-hint">또는 '파일 불러오기' 버튼을 클릭하세요</div>
+                </div>
+                <div id="tab3-content" style="display: none; flex-direction: column;">
+                    <div class="table-container" style="flex: 1; display: flex; flex-direction: column;">
+                        <!-- Filters -->
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label class="filter-label">Brand 브랜드</label>
+                                <select id="brandFilter" onchange="applyDetailFilters()">
+                                    <option value="">All</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label class="filter-label">Ship To 바이어</label>
+                                <select id="shipToFilter" onchange="applyDetailFilters()">
+                                    <option value="">All</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label class="filter-label">Aging Period 회수기간</label>
+                                <select id="agingPeriodFilter" onchange="applyDetailFilters()">
+                                    <option value="">All</option>
+                                    <option value="0-30">0-30 Days</option>
+                                    <option value="31-59">31-59 Days</option>
+                                    <option value="60-89">60-89 Days</option>
+                                    <option value="90-119">90-119 Days</option>
+                                    <option value="120+">120+ Days</option>
+                                </select>
+                            </div>
+                            <div class="filter-group" style="flex: 1;">
+                                <label class="filter-label">Invoice# 인보이스 검색</label>
+                                <input type="text" class="search-box" id="invoiceSearchFilter" placeholder="Search..." onkeyup="applyDetailFilters()">
+                            </div>
+                        </div>
+
+                        <!-- Table -->
+                        <div style="overflow-x: auto; flex: 1;">
+                            <table id="detailTable">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable">Brand 브랜드</th>
+                                        <th class="sortable">Ship Date 납기일</th>
+                                        <th class="sortable" style="text-align: right;">Aging 회수일</th>
+                                        <th class="sortable">Invoice# 인보이스</th>
+                                        <th class="sortable">Ship To 납품처</th>
+                                        <th class="sortable">Type 유형</th>
+                                        <th class="sortable">Requester 요청자</th>
+                                        <th class="sortable" style="text-align: right;">Amount 청구액</th>
+                                        <th class="sortable">Date Paid 수금일</th>
+                                        <th class="sortable" style="text-align: right;">Amount Paid 수금액</th>
+                                        <th class="sortable" style="text-align: right;">Balance 미수금</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detailTableBody"></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="pagination">
+                            <span class="pagination-info" id="paginationInfo"></span>
+                            <button class="pagination-btn" id="prevBtn" onclick="previousPage()">
+                                <span class="material-icons-round">chevron_left</span>
+                            </button>
+                            <span class="pagination-info" id="pageNum"></span>
+                            <button class="pagination-btn" id="nextBtn" onclick="nextPage()">
+                                <span class="material-icons-round">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Chart.js
+        Chart.register(ChartDataLabels);
+
+        // Global Variables
+        let allData = [];
+        let allInvoices = [];
+        let brandStats = [];
+        let chartInstances = {};
+        let currentPage = 0;
+        const rowsPerPage = 50;
+        let filteredInvoices = [];
+        let currentOverviewFilter = null;
+        let showAllOverviewInvoices = false;
+        let currentSortColumn = null;
+        let currentSortOrder = 'asc';
+
+        // Logo Setup
+        function setupLogo() {
+            const logoImg = document.getElementById('logoImg');
+            logoImg.src = 'data:image/png;base64,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';
+        }
+        setupLogo();
+
+        // Format Functions
+        const formatCurrency = (val) => {
+            if (val === null || val === undefined || val === '') return '-';
+            const num = parseFloat(val);
+            if (isNaN(num)) return '-';
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(num);
+        };
+
+        const formatPercentage = (val) => {
+            if (val === null || val === undefined) return '-';
+            const num = parseFloat(val);
+            if (isNaN(num)) return '-';
+            return (num * 100).toFixed(1) + '%';
+        };
+
+        const formatDate = (val) => {
+            if (!val) return '-';
+            if (typeof val === 'number') {
+                const epoch = new Date(1899, 11, 30);
+                const d = new Date(epoch.getTime() + val * 86400000);
+                return d.toISOString().split('T')[0];
+            }
+            try {
+                return new Date(val).toISOString().split('T')[0];
+            } catch {
+                return val ? String(val).substring(0, 10) : '-';
+            }
+        };
+
+        // Parse Excel Date
+        const parseExcelDate = (val) => {
+            if (!val) return '';
+            if (typeof val === 'number') {
+                const epoch = new Date(1899, 11, 30);
+                const d = new Date(epoch.getTime() + val * 86400000);
+                return d.toISOString().split('T')[0];
+            }
+            try {
+                return new Date(val).toISOString().split('T')[0];
+            } catch {
+                return '';
+            }
+        };
+
+        // Tab Switching
+        function switchTab(index) {
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab-content').forEach((content, i) => {
+                content.classList.toggle('active', i === index);
+            });
+            if (index === 0) {
+                setTimeout(() => {
+                    if (chartInstances.aging) chartInstances.aging.resize();
+                    if (chartInstances.brands) chartInstances.brands.resize();
+                }, 100);
+            }
+        }
+
+        // File Upload Handler
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const workbook = XLSX.read(e.target.result, { cellFormula: false, cellDates: false });
+                    processWorkbook(workbook);
+                } catch (error) {
+                    console.error('Error reading file:', error);
+                    alert('Error reading Excel file');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Process Workbook
+        function processWorkbook(workbook) {
+            allData = [];
+            allInvoices = [];
+
+            const ignoreSheets = ['100% Payment', 'LIST', 'KLIM Payment', '기타', 'Sheet1'];
+
+            workbook.SheetNames.forEach(sheetName => {
+                if (ignoreSheets.includes(sheetName)) return;
+
+                let brandName = sheetName;
+                let isSpecial = false;
+
+                if (sheetName === '100% Payment (list정리)') {
+                    brandName = '100%';
+                    isSpecial = true;
+                }
+
+                const worksheet = workbook.Sheets[sheetName];
+                const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+                const rows = range.e.r - 7; // Start at row 8 (index 7)
+
+                for (let i = 0; i < rows; i++) {
+                    const rowIndex = 8 + i; // Row 8 onwards
+                    const getCell = (col) => {
+                        const cell = worksheet[XLSX.utils.encode_col(col) + rowIndex];
+                        return cell ? cell.v : '';
+                    };
+
+                    let A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P;
+
+                    if (isSpecial) {
+                        // 100% sheet columns
+                        A = getCell(0); // Region
+                        B = getCell(1); // ShipDate
+                        C = getCell(2); // Aging
+                        D = getCell(3); // Invoice#
+                        E = getCell(4); // ShipTo
+                        F = ''; // Not used
+                        G = getCell(6); // Type
+                        H = getCell(7); // Requester
+                        I = getCell(8); // Amount
+                        J = getCell(9); // DatePaid
+                        K = getCell(10); // AmountPaid
+                        L = getCell(11); // SubAmount
+                        M = getCell(12); // Credit
+                        N = getCell(13); // CreditInvoice
+                        O = getCell(14); // CreditDeduct
+                        P = getCell(15); // Balance
+                    } else {
+                        // Other sheets columns
+                        A = getCell(0); // Region
+                        B = getCell(1); // ShipDate
+                        C = getCell(2); // Aging
+                        D = getCell(3); // Invoice#
+                        E = getCell(4); // ShipTo
+                        F = getCell(5); // Type
+                        G = getCell(6); // Requester
+                        H = getCell(7); // Amount
+                        I = getCell(8); // DatePaid
+                        J = getCell(9); // AmountPaid
+                        K = getCell(10); // Balance
+                    }
+
+                    // Skip empty invoice rows and Total rows
+                    if (!D || String(D).trim() === '') continue;
+                    if (A && String(A).includes('Total')) continue;
+
+                    const invoice = {
+                        brand: brandName,
+                        region: A || '',
+                        shipDate: formatDate(B),
+                        aging: parseFloat(C) || 0,
+                        invoice: String(D).trim(),
+                        shipTo: E || '',
+                        type: isSpecial ? (G || '') : (F || ''),
+                        requester: isSpecial ? (H || '') : (G || ''),
+                        amount: parseFloat(isSpecial ? I : H) || 0,
+                        datePaid: formatDate(isSpecial ? J : I),
+                        amountPaid: parseFloat(isSpecial ? K : J) || 0,
+                        balance: parseFloat(isSpecial ? P : K) || 0
+                    };
+
+                    if (invoice.amount !== 0) {
+                        allInvoices.push(invoice);
+                    }
+                }
+            });
+
+            // Calculate brand stats
+            calculateBrandStats();
+
+            // Show data
+            showDataTabs();
+
+            // Initial render
+            renderOverviewTab();
+        }
+
+        // Calculate Brand Stats
+        function calculateBrandStats() {
+            const brandMap = {};
+
+            allInvoices.forEach(inv => {
+                if (!brandMap[inv.brand]) {
+                    brandMap[inv.brand] = {
+                        brand: inv.brand,
+                        totalInvoiced: 0,
+                        totalPaid: 0,
+                        outstanding: 0,
+                        overdue60: 0,
+                        avgAging: 0,
+                        count: 0,
+                        agingSum: 0,
+                        invoices: []
+                    };
+                }
+
+                const brand = brandMap[inv.brand];
+                brand.totalInvoiced += inv.amount;
+                brand.totalPaid += inv.amountPaid;
+                brand.outstanding += inv.balance;
+                brand.count += 1;
+                brand.invoices.push(inv);
+
+                if (inv.aging >= 60 && inv.balance > 0) {
+                    brand.overdue60 += inv.balance;
+                }
+
+                if (inv.balance > 0) {
+                    brand.agingSum += inv.aging;
+                }
+            });
+
+            brandStats = Object.values(brandMap).map(b => ({
+                ...b,
+                collectionRate: b.totalInvoiced > 0 ? b.totalPaid / b.totalInvoiced : 0,
+                avgAging: b.invoices.filter(i => i.balance > 0).length > 0
+                    ? b.agingSum / b.invoices.filter(i => i.balance > 0).length
+                    : 0
+            }));
+
+            brandStats.sort((a, b) => b.outstanding - a.outstanding);
+        }
+
+        // Show Data Tabs
+        function showDataTabs() {
+            document.getElementById('tab1-empty').style.display = 'none';
+            document.getElementById('tab1-content').style.display = 'block';
+            document.getElementById('tab2-empty').style.display = 'none';
+            document.getElementById('tab2-content').style.display = 'block';
+            document.getElementById('tab3-empty').style.display = 'none';
+            document.getElementById('tab3-content').style.display = 'flex';
+            document.getElementById('dateBadge').textContent = new Date().toISOString().split('T')[0] + ' updated';
+        }
+
+        // Render Overview Tab
+        function renderOverviewTab() {
+            renderKPICards();
+            renderAgingChart();
+            renderBrandsChart();
+            renderOverviewInvoices();
+            populateDetailFilters();
+        }
+
+        // Render KPI Cards
+        function renderKPICards() {
+            const totalOutstanding = allInvoices.reduce((sum, inv) => sum + inv.balance, 0);
+            const overdue60 = allInvoices.reduce((sum, inv) => inv.aging >= 60 && inv.balance > 0 ? sum + inv.balance : sum, 0);
+            const totalAmount = allInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+            const totalPaid = allInvoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
+            const collectionRate = totalAmount > 0 ? totalPaid / totalAmount : 0;
+            const activeBrands = new Set(allInvoices.filter(inv => inv.balance > 0).map(inv => inv.brand)).size;
+            const avgAging = allInvoices.filter(inv => inv.balance > 0).length > 0
+                ? allInvoices.filter(inv => inv.balance > 0).reduce((sum, inv) => sum + inv.aging, 0) /
+                  allInvoices.filter(inv => inv.balance > 0).length
+                : 0;
+
+            const kpiRow = document.getElementById('kpiRow');
+            kpiRow.innerHTML = `
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Outstanding<span class="kpi-label-kr">총 미수금</span></div>
+                    <div class="kpi-value currency">${formatCurrency(totalOutstanding)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Overdue 60+ Days<span class="kpi-label-kr">60일이상 연체금</span></div>
+                    <div class="kpi-value currency">${formatCurrency(overdue60)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Collection Rate<span class="kpi-label-kr">수금율</span></div>
+                    <div class="kpi-value">${formatPercentage(collectionRate)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Active Brands<span class="kpi-label-kr">미수금 보유 브랜드</span></div>
+                    <div class="kpi-value">${activeBrands}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Aging<span class="kpi-label-kr">평균 회수 기간</span></div>
+                    <div class="kpi-value">${avgAging.toFixed(1)}</div>
+                    <div class="kpi-unit">days</div>
+                </div>
+            `;
+        }
+
+        // Render Aging Chart
+        function renderAgingChart() {
+            const buckets = {
+                '0-30': { count: 0, amount: 0 },
+                '31-59': { count: 0, amount: 0 },
+                '60-89': { count: 0, amount: 0 },
+                '90-119': { count: 0, amount: 0 },
+                '120+': { count: 0, amount: 0 }
+            };
+
+            allInvoices.forEach(inv => {
+                if (inv.balance <= 0) return;
+
+                let bucket;
+                if (inv.aging <= 30) bucket = '0-30';
+                else if (inv.aging <= 59) bucket = '31-59';
+                else if (inv.aging <= 89) bucket = '60-89';
+                else if (inv.aging <= 119) bucket = '90-119';
+                else bucket = '120+';
+
+                buckets[bucket].count += 1;
+                buckets[bucket].amount += inv.balance;
+            });
+
+            const labels = Object.keys(buckets);
+            const counts = Object.values(buckets).map(b => b.count);
+            const amounts = Object.values(buckets).map(b => b.amount);
+
+            const ctx = document.getElementById('agingChart').getContext('2d');
+
+            if (chartInstances.aging) chartInstances.aging.destroy();
+
+            chartInstances.aging = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Invoice Count',
+                            data: counts,
+                            backgroundColor: [
+                                'rgba(186, 230, 253, 0.7)',
+                                'rgba(125, 211, 252, 0.75)',
+                                'rgba(56, 189, 248, 0.8)',
+                                'rgba(14, 165, 233, 0.8)',
+                                'rgba(2, 132, 199, 0.85)'
+                            ],
+                            borderColor: [
+                                'rgba(186, 230, 253, 1)',
+                                'rgba(125, 211, 252, 1)',
+                                'rgba(56, 189, 248, 1)',
+                                'rgba(14, 165, 233, 1)',
+                                'rgba(2, 132, 199, 1)'
+                            ],
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            yAxisID: 'y',
+                            datalabels: {
+                                color: '#334155',
+                                font: { weight: 'bold', size: 11 },
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            label: 'Amount (USD)',
+                            data: amounts,
+                            borderColor: 'rgba(2, 132, 199, 0.6)',
+                            borderWidth: 2,
+                            type: 'line',
+                            yAxisID: 'y1',
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: 'rgba(2, 132, 199, 0.8)',
+                            pointRadius: 4,
+                            datalabels: { display: false }
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(4, 21, 39, 0.8)',
+                            padding: 10,
+                            titleFont: { size: 12 },
+                            bodyFont: { size: 11 }
+                        },
+                        datalabels: { display: true }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            ticks: { color: '#64748b', font: { size: 10 } },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            ticks: { color: '#64748b', font: { size: 10 } },
+                            grid: { drawOnChartArea: false }
+                        },
+                        x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+                    }
+                }
+            });
+
+            // Click handler for aging chart
+            document.getElementById('agingChart').onclick = (evt) => {
+                const points = chartInstances.aging.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+                if (points.length > 0) {
+                    const index = points[0].index;
+                    const label = chartInstances.aging.data.labels[index];
+                    filterOverviewByAging(label);
+                }
+            };
+        }
+
+        // Render Brands Chart
+        function renderBrandsChart() {
+            const topBrands = brandStats.slice(0, 5);
+            const others = brandStats.slice(5).reduce((sum, b) => sum + b.outstanding, 0);
+
+            const labels = topBrands.map(b => b.brand);
+            const data = topBrands.map(b => b.outstanding);
+
+            if (others > 0) {
+                labels.push('Others');
+                data.push(others);
+            }
+
+            const colors = ['#009AB8', '#38bdf8', '#B8D544', '#FFB81C', '#FF6B6B', '#E0E0E0'];
+
+            const ctx = document.getElementById('brandsChart').getContext('2d');
+
+            if (chartInstances.brands) chartInstances.brands.destroy();
+
+            chartInstances.brands = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderColor: 'rgba(255, 255, 255, 0.6)',
+                        borderWidth: 1,
+                        datalabels: {
+                            formatter: (value, ctx) => {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = (value / total) * 100;
+                                return pct < 5 ? '' : pct.toFixed(1) + '%';
+                            },
+                            color: '#334155',
+                            font: { weight: 'bold' }
+                        }
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { font: { size: 11 }, color: '#334155', padding: 10, boxWidth: 12 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(4, 21, 39, 0.8)',
+                            padding: 10,
+                            titleFont: { size: 12 },
+                            bodyFont: { size: 11 },
+                            callbacks: {
+                                label: (ctx) => {
+                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                    const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                                    return `${formatCurrency(ctx.parsed)} (${pct}%)`;
+                                }
+                            }
+                        },
+                        datalabels: { display: true }
+                    }
+                }
+            });
+
+            // Add click listener for filtering
+            document.getElementById('brandsChart').onclick = (evt) => {
+                const points = chartInstances.brands.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+                if (points.length > 0) {
+                    const index = points[0].index;
+                    const label = chartInstances.brands.data.labels[index];
+                    filterOverviewByBrand(label);
+                }
+            };
+        }
+
+        // Render Overview Invoices
+        function renderOverviewInvoices() {
+            currentOverviewFilter = null;
+            showAllOverviewInvoices = false;
+            updateOverviewTable();
+        }
+
+        // Update Overview Table
+        function updateOverviewTable() {
+            let invoices = allInvoices.filter(inv => inv.balance > 0);
+
+            if (currentOverviewFilter) {
+                if (currentOverviewFilter.type === 'aging') {
+                    const period = currentOverviewFilter.value;
+                    let min = 0, max = Infinity;
+                    if (period === '0-30') { min = 0; max = 30; }
+                    else if (period === '31-59') { min = 31; max = 59; }
+                    else if (period === '60-89') { min = 60; max = 89; }
+                    else if (period === '90-119') { min = 90; max = 119; }
+                    else if (period === '120+') { min = 120; max = Infinity; }
+                    invoices = invoices.filter(inv => inv.aging >= min && inv.aging <= max);
+                } else if (currentOverviewFilter.type === 'brand') {
+                    invoices = invoices.filter(inv => inv.brand === currentOverviewFilter.value);
+                }
+            }
+
+            const displayInvoices = showAllOverviewInvoices ? invoices : invoices.slice(0, 20);
+            const tbody = document.getElementById('overviewTableBody');
+            const tableTitle = document.getElementById('invoiceTableTitle');
+
+            if (currentOverviewFilter) {
+                if (currentOverviewFilter.type === 'aging') {
+                    tableTitle.textContent = `Aging ${currentOverviewFilter.value} Days 인보이스`;
+                } else if (currentOverviewFilter.type === 'brand') {
+                    tableTitle.textContent = `${currentOverviewFilter.value} 브랜드 인보이스`;
+                }
+            } else {
+                tableTitle.textContent = '인보이스 현황';
+            }
+
+            tbody.innerHTML = displayInvoices.map(inv => `
+                <tr>
+                    <td>${inv.brand}</td>
+                    <td>${inv.invoice}</td>
+                    <td>${inv.shipTo}${inv.region ? ' (' + inv.region + ')' : ''}</td>
+                    <td style="text-align: right;">${inv.aging}</td>
+                    <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatCurrency(inv.amount)}</td>
+                    <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatCurrency(inv.balance)}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('overviewShowAll').style.display = invoices.length > 20 ? 'block' : 'none';
+        }
+
+        // Filter Overview by Aging (from chart click)
+        function filterOverviewByAging(period) {
+            currentOverviewFilter = { type: 'aging', value: period };
+            showAllOverviewInvoices = false;
+            updateOverviewTable();
+        }
+
+        // Filter Overview by Brand (from chart click)
+        function filterOverviewByBrand(brand) {
+            currentOverviewFilter = { type: 'brand', value: brand };
+            showAllOverviewInvoices = false;
+            updateOverviewTable();
+        }
+
+        // Clear Overview Filter
+        function clearOverviewFilter() {
+            currentOverviewFilter = null;
+            showAllOverviewInvoices = false;
+            updateOverviewTable();
+        }
+
+        // Toggle Show All Invoices
+        function toggleShowAllOverviewInvoices() {
+            showAllOverviewInvoices = !showAllOverviewInvoices;
+            updateOverviewTable();
+        }
+
+        // (Aging chart click is bound inside renderAgingChart)
+
+        // Populate Detail Filters
+        function populateDetailFilters() {
+            // Brand filter
+            const brandSet = new Set(allInvoices.map(inv => inv.brand).filter(v => v));
+            const brandSelect = document.getElementById('brandFilter');
+            const currentBrand = brandSelect.value;
+            brandSelect.innerHTML = '<option value="">All</option>' +
+                Array.from(brandSet).sort().map(v => `<option value="${v}">${v}</option>`).join('');
+            brandSelect.value = currentBrand || '';
+
+            // Ship To filter
+            const shipToSet = new Set(allInvoices.map(inv => inv.shipTo).filter(v => v));
+            const shipToSelect = document.getElementById('shipToFilter');
+            const currentShipTo = shipToSelect.value;
+            shipToSelect.innerHTML = '<option value="">All</option>' +
+                Array.from(shipToSet).sort().map(v => `<option value="${v}">${v}</option>`).join('');
+            shipToSelect.value = currentShipTo || '';
+        }
+
+        // Apply Detail Filters
+        function applyDetailFilters() {
+            const brand = document.getElementById('brandFilter').value;
+            const shipTo = document.getElementById('shipToFilter').value;
+            const agingPeriod = document.getElementById('agingPeriodFilter').value;
+            const invoiceSearch = document.getElementById('invoiceSearchFilter').value.toLowerCase();
+
+            filteredInvoices = allInvoices.filter(inv => {
+                if (brand && inv.brand !== brand) return false;
+                if (shipTo && inv.shipTo !== shipTo) return false;
+                if (agingPeriod) {
+                    let min = 0, max = Infinity;
+                    if (agingPeriod === '0-30') { min = 0; max = 30; }
+                    else if (agingPeriod === '31-59') { min = 31; max = 59; }
+                    else if (agingPeriod === '60-89') { min = 60; max = 89; }
+                    else if (agingPeriod === '90-119') { min = 90; max = 119; }
+                    else if (agingPeriod === '120+') { min = 120; max = Infinity; }
+                    if (inv.aging < min || inv.aging > max) return false;
+                }
+                if (invoiceSearch && !inv.invoice.toLowerCase().includes(invoiceSearch)) return false;
+                return true;
+            });
+
+            currentPage = 0;
+            renderDetailTable();
+        }
+
+        // Render Detail Table
+        function renderDetailTable() {
+            const tbody = document.getElementById('detailTableBody');
+            const start = currentPage * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageData = filteredInvoices.slice(start, end);
+
+            tbody.innerHTML = pageData.map(inv => `
+                <tr>
+                    <td>${inv.brand}</td>
+                    <td>${inv.shipDate}</td>
+                    <td style="text-align: right;">${inv.aging}</td>
+                    <td>${inv.invoice}</td>
+                    <td>${inv.shipTo}${inv.region ? ' (' + inv.region + ')' : ''}</td>
+                    <td>${inv.type}</td>
+                    <td>${inv.requester}</td>
+                    <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatCurrency(inv.amount)}</td>
+                    <td>${inv.datePaid}</td>
+                    <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatCurrency(inv.amountPaid)}</td>
+                    <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatCurrency(inv.balance)}</td>
+                </tr>
+            `).join('');
+
+            const totalPages = Math.ceil(filteredInvoices.length / rowsPerPage);
+            document.getElementById('paginationInfo').textContent = `${start + 1}-${Math.min(end, filteredInvoices.length)} of ${filteredInvoices.length}`;
+            document.getElementById('pageNum').textContent = `${currentPage + 1}/${totalPages}`;
+            document.getElementById('prevBtn').disabled = currentPage === 0;
+            document.getElementById('nextBtn').disabled = currentPage >= totalPages - 1;
+        }
+
+        // Pagination
+        function nextPage() {
+            const totalPages = Math.ceil(filteredInvoices.length / rowsPerPage);
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                renderDetailTable();
+                document.querySelector('#tab3-content .table-container').scrollTop = 0;
+            }
+        }
+
+        function previousPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                renderDetailTable();
+                document.querySelector('#tab3-content .table-container').scrollTop = 0;
+            }
+        }
+
+        // Render Brand Status Table
+        function renderBrandTable() {
+            const tbody = document.getElementById('brandTableBody');
+            tbody.innerHTML = brandStats.map(b => {
+                let rateClass = 'rate-red';
+                if (b.collectionRate > 0.8) rateClass = 'rate-green';
+                else if (b.collectionRate > 0.5) rateClass = 'rate-yellow';
+
+                return `
+                    <tr>
+                        <td>${b.brand}</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatCurrency(b.totalInvoiced)}</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatCurrency(b.totalPaid)}</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatCurrency(b.outstanding)}</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">${formatCurrency(b.overdue60)}</td>
+                        <td style="text-align: right; padding: 10px 12px;" class="${rateClass}">${formatPercentage(b.collectionRate)}</td>
+                        <td style="text-align: right;">${b.avgAging.toFixed(1)}</td>
+                        <td style="text-align: right;">${b.count}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            addBrandTableSorting();
+        }
+
+        // Brand Table Sorting
+        function addBrandTableSorting() {
+            const headers = document.querySelectorAll('#brandTable thead th.sortable');
+            headers.forEach((header, index) => {
+                header.onclick = () => {
+                    const isAsc = header.classList.contains('sort-asc');
+                    headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+
+                    if (isAsc) {
+                        header.classList.add('sort-desc');
+                    } else {
+                        header.classList.add('sort-asc');
+                    }
+
+                    const sortMap = [
+                        'brand', 'totalInvoiced', 'totalPaid', 'outstanding',
+                        'overdue60', 'collectionRate', 'avgAging', 'count'
+                    ];
+                    const sortKey = sortMap[index];
+
+                    brandStats.sort((a, b) => {
+                        const aVal = a[sortKey];
+                        const bVal = b[sortKey];
+                        if (typeof aVal === 'string') {
+                            return isAsc ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+                        }
+                        return isAsc ? bVal - aVal : aVal - bVal;
+                    });
+
+                    renderBrandTable();
+                };
+            });
+        }
+
+        // Initialize Detail Table Sorting
+        function addDetailTableSorting() {
+            const headers = document.querySelectorAll('#detailTable thead th.sortable');
+            headers.forEach((header, index) => {
+                header.onclick = () => {
+                    const isAsc = header.classList.contains('sort-asc');
+                    headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+
+                    if (isAsc) {
+                        header.classList.add('sort-desc');
+                    } else {
+                        header.classList.add('sort-asc');
+                    }
+
+                    const sortMap = [
+                        'brand', 'shipDate', 'aging', 'invoice', 'shipTo',
+                        'type', 'requester', 'amount', 'datePaid', 'amountPaid', 'balance'
+                    ];
+                    const sortKey = sortMap[index];
+
+                    filteredInvoices.sort((a, b) => {
+                        const aVal = a[sortKey];
+                        const bVal = b[sortKey];
+                        if (typeof aVal === 'string') {
+                            return isAsc ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+                        }
+                        return isAsc ? bVal - aVal : aVal - bVal;
+                    });
+
+                    currentPage = 0;
+                    renderDetailTable();
+                };
+            });
+        }
+
+        // Render Brand Table on Tab Change
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.tab') === document.querySelectorAll('.tab')[1]) {
+                setTimeout(() => renderBrandTable(), 10);
+            }
+            if (e.target.closest('.tab') === document.querySelectorAll('.tab')[2]) {
+                setTimeout(() => {
+                    applyDetailFilters();
+                    addDetailTableSorting();
+                }, 10);
+            }
+        });
+
+        // Drag & Drop
+        const dropOverlay = document.getElementById('dropOverlay');
+        let dragCounter = 0;
+
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            dropOverlay.classList.add('active');
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter <= 0) { dragCounter = 0; dropOverlay.classList.remove('active'); }
+        });
+
+        document.addEventListener('dragover', (e) => { e.preventDefault(); });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dropOverlay.classList.remove('active');
+            const file = e.dataTransfer.files[0];
+            if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const workbook = XLSX.read(ev.target.result, { cellFormula: false, cellDates: false });
+                        processWorkbook(workbook);
+                    } catch (error) {
+                        console.error('Error reading file:', error);
+                        alert('Error reading Excel file');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+    </script>
+</body>
+</html>
