@@ -718,7 +718,7 @@
                                     <option value="">All</option>
                                     <option value="paid">수금완료</option>
                                     <option value="unpaid">미수금</option>
-                                    <option value="estimated">추정 Aging</option>
+                                    <option value="offset">상계</option>
                                 </select>
                             </div>
                             <div class="filter-group" style="flex: 1;">
@@ -956,6 +956,9 @@
                         realAging = daysBetween(shipD, paidD);
                     }
 
+                    // 마이너스 인보이스(크레딧 메모/불량 대체) → 제외
+                    if (amountVal < 0) continue;
+
                     // 데이터 보정
                     const hasPaidDate = (datePaidStr && datePaidStr !== '-');
                     let correctedBalance = balanceVal;
@@ -965,8 +968,9 @@
                         correctedBalance = 0;
                     }
 
-                    // 수금 완료 판정: Date Paid 있거나, Balance=0이고 청구액 있는 경우 (Sub Amount 입금 포함)
-                    const isPaid = hasPaidDate || (balanceVal === 0 && amountVal !== 0);
+                    // 분류: 수금완료 / 상계(불량 대체) / 미수금
+                    const isOffset = !hasPaidDate && balanceVal === 0 && amountVal > 0;
+                    const isPaid = hasPaidDate && !isOffset;
 
                     const invoice = {
                         brand: brandName,
@@ -982,9 +986,8 @@
                         datePaid: datePaidStr,
                         amountPaid: amountPaidVal,
                         balance: correctedBalance,
-                        anomaly: null,
                         isPaid: isPaid,
-                        estimatedAging: false
+                        isOffset: isOffset
                     };
 
                     if (invoice.amount !== 0) {
@@ -993,66 +996,9 @@
                 }
             });
 
-            estimateMissingAging();
             calculateBrandStats();
             showDataTabs();
             renderOverviewTab();
-        }
-
-        // ==================== Estimate Missing Aging ====================
-        function estimateMissingAging() {
-            // Date Paid 없이 수금 완료된 건(Sub Amount 입금)의 realAging을 앞뒤 인보이스 기준으로 추정
-            const brandGroups = {};
-            allInvoices.forEach(inv => {
-                if (!brandGroups[inv.brand]) brandGroups[inv.brand] = [];
-                brandGroups[inv.brand].push(inv);
-            });
-
-            Object.values(brandGroups).forEach(invoices => {
-                invoices.sort((a, b) => a.shipDate.localeCompare(b.shipDate));
-
-                const knownAging = invoices.filter(i => i.isPaid && i.realAging !== null);
-                const brandAvg = knownAging.length > 0
-                    ? knownAging.reduce((s, i) => s + i.realAging, 0) / knownAging.length
-                    : null;
-
-                invoices.forEach((inv, idx) => {
-                    if (inv.isPaid && inv.realAging === null) {
-                        // 앞뒤 인보이스 중 realAging이 있는 가장 가까운 것 찾기
-                        let before = null, after = null;
-                        for (let j = idx - 1; j >= 0; j--) {
-                            if (invoices[j].isPaid && invoices[j].realAging !== null) {
-                                before = invoices[j].realAging;
-                                break;
-                            }
-                        }
-                        for (let j = idx + 1; j < invoices.length; j++) {
-                            if (invoices[j].isPaid && invoices[j].realAging !== null) {
-                                after = invoices[j].realAging;
-                                break;
-                            }
-                        }
-
-                        let estimated;
-                        if (before !== null && after !== null) {
-                            estimated = Math.round((before + after) / 2);
-                        } else if (before !== null) {
-                            estimated = before;
-                        } else if (after !== null) {
-                            estimated = after;
-                        } else if (brandAvg !== null) {
-                            estimated = Math.round(brandAvg);
-                        } else {
-                            estimated = null;
-                        }
-
-                        if (estimated !== null) {
-                            inv.realAging = estimated;
-                            inv.estimatedAging = true;
-                        }
-                    }
-                });
-            });
         }
 
         // ==================== Brand Stats ====================
@@ -1063,10 +1009,12 @@
                 if (!brandMap[inv.brand]) {
                     brandMap[inv.brand] = {
                         brand: inv.brand,
-                        totalInvoiced: 0,
-                        totalPaid: 0,
+                        totalInvoiced: 0,    // 실거래 청구액 (상계 제외)
+                        totalPaid: 0,        // 실거래 수금액 (상계 제외)
                         outstanding: 0,
                         overdue60: 0,
+                        offsetAmount: 0,     // 상계 금액
+                        offsetCount: 0,
                         count: 0,
                         realAgingSum: 0,
                         realAgingCount: 0,
@@ -1075,20 +1023,28 @@
                 }
 
                 const b = brandMap[inv.brand];
-                b.totalInvoiced += inv.amount;
-                b.totalPaid += inv.amountPaid;
-                b.outstanding += inv.balance;
                 b.count += 1;
                 b.invoices.push(inv);
+                b.outstanding += inv.balance;
 
-                if (inv.aging >= 60 && inv.balance > 0) {
-                    b.overdue60 += inv.balance;
-                }
+                if (inv.isOffset) {
+                    // 상계 건: 수금율/Aging 계산에서 제외
+                    b.offsetAmount += inv.amount;
+                    b.offsetCount += 1;
+                } else {
+                    // 실거래 건만 수금율 계산에 포함
+                    b.totalInvoiced += inv.amount;
+                    b.totalPaid += inv.amountPaid;
 
-                // Avg Aging: 수금 완료된 인보이스만 (realAging 있는 경우)
-                if (inv.isPaid && inv.realAging !== null) {
-                    b.realAgingSum += inv.realAging;
-                    b.realAgingCount += 1;
+                    if (inv.aging >= 60 && inv.balance > 0) {
+                        b.overdue60 += inv.balance;
+                    }
+
+                    // Avg Aging: 실거래 수금 완료 건만
+                    if (inv.isPaid && inv.realAging !== null) {
+                        b.realAgingSum += inv.realAging;
+                        b.realAgingCount += 1;
+                    }
                 }
             });
 
@@ -1175,15 +1131,17 @@
 
         // KPI Cards
         function renderKPICards() {
-            const totalOutstanding = allInvoices.reduce((sum, inv) => sum + inv.balance, 0);
-            const overdue60 = allInvoices.reduce((sum, inv) => inv.aging >= 60 && inv.balance > 0 ? sum + inv.balance : sum, 0);
-            const totalAmount = allInvoices.reduce((sum, inv) => sum + inv.amount, 0);
-            const totalPaid = allInvoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
+            const realInvoices = allInvoices.filter(inv => !inv.isOffset); // 상계 제외
+            const totalOutstanding = realInvoices.reduce((sum, inv) => sum + inv.balance, 0);
+            const overdue60 = realInvoices.reduce((sum, inv) => inv.aging >= 60 && inv.balance > 0 ? sum + inv.balance : sum, 0);
+            const totalAmount = realInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+            const totalPaid = realInvoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
             const collectionRate = totalAmount > 0 ? totalPaid / totalAmount : 0;
-            const activeBrands = new Set(allInvoices.filter(inv => inv.balance > 0).map(inv => inv.brand)).size;
+            const activeBrands = new Set(realInvoices.filter(inv => inv.balance > 0).map(inv => inv.brand)).size;
+            const offsetCount = allInvoices.filter(inv => inv.isOffset).length;
 
-            // Avg Aging: 수금 완료 인보이스만 (realAging 기준)
-            const paidInvoices = allInvoices.filter(inv => inv.isPaid && inv.realAging !== null);
+            // Avg Aging: 실거래 수금 완료 인보이스만
+            const paidInvoices = realInvoices.filter(inv => inv.isPaid && inv.realAging !== null);
             const avgAging = paidInvoices.length > 0
                 ? paidInvoices.reduce((sum, inv) => sum + inv.realAging, 0) / paidInvoices.length
                 : 0;
@@ -1199,12 +1157,13 @@
                     <div class="kpi-value currency">${formatCurrency(overdue60)}</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Collection Rate<span class="kpi-label-kr">수금율</span></div>
+                    <div class="kpi-label">Collection Rate<span class="kpi-label-kr">수금율 (상계 제외)</span></div>
                     <div class="kpi-value">${formatPercentage(collectionRate)}</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Active Brands<span class="kpi-label-kr">미수금 보유 브랜드</span></div>
                     <div class="kpi-value">${activeBrands}</div>
+                    <div class="kpi-unit">상계 ${offsetCount}건 제외</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Collection Days<span class="kpi-label-kr">평균 회수기간 (수금완료)</span></div>
@@ -1405,10 +1364,10 @@
 
             tbody.innerHTML = displayInvoices.map(inv => {
                 let agingDisplay;
-                if (inv.realAging !== null) {
-                    agingDisplay = inv.estimatedAging
-                        ? `<span title="추정값">${inv.realAging}<sup style="color:var(--ogk-cyan);font-size:9px;">추정</sup></span>`
-                        : `${inv.realAging}`;
+                if (inv.isOffset) {
+                    agingDisplay = `<span style="color:#6366f1;font-size:12px;">상계</span>`;
+                } else if (inv.realAging !== null) {
+                    agingDisplay = `${inv.realAging}`;
                 } else {
                     agingDisplay = `<span class="aging-unpaid">미수금</span>`;
                 }
@@ -1502,13 +1461,10 @@
             const datasets = [];
 
             // Dataset 1: 수금 완료 (실제 회수일)
-            const confirmedPaid = paidData.filter(inv => !inv.estimatedAging);
-            const estimatedPaid = paidData.filter(inv => inv.estimatedAging);
-
-            if (confirmedPaid.length > 0) {
+            if (paidData.length > 0) {
                 datasets.push({
                     label: '회수일 (수금완료)',
-                    data: confirmedPaid.map(inv => ({
+                    data: paidData.map(inv => ({
                         x: inv.shipDate,
                         y: inv.realAging,
                         invoice: inv.invoice,
@@ -1524,30 +1480,6 @@
                     showLine: true,
                     tension: 0.1,
                     fill: false,
-                    datalabels: { display: false }
-                });
-            }
-
-            // Dataset 1b: 수금완료 (추정 회수일)
-            if (estimatedPaid.length > 0) {
-                datasets.push({
-                    label: '회수일 (추정)',
-                    data: estimatedPaid.map(inv => ({
-                        x: inv.shipDate,
-                        y: inv.realAging,
-                        invoice: inv.invoice,
-                        brand: inv.brand,
-                        shipTo: inv.shipTo,
-                        datePaid: '추정'
-                    })),
-                    borderColor: 'rgba(0, 154, 184, 0.35)',
-                    backgroundColor: 'rgba(0, 154, 184, 0.3)',
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    pointStyle: 'rectRot',
-                    borderWidth: 1,
-                    borderDash: [3, 3],
-                    showLine: false,
                     datalabels: { display: false }
                 });
             }
@@ -1729,7 +1661,7 @@
                 if (invoiceSearch && !inv.invoice.toLowerCase().includes(invoiceSearch)) return false;
                 if (status === 'paid' && !inv.isPaid) return false;
                 if (status === 'unpaid' && inv.isPaid) return false;
-                if (status === 'estimated' && !inv.estimatedAging) return false;
+                if (status === 'offset' && !inv.isOffset) return false;
                 return true;
             });
 
@@ -1744,17 +1676,12 @@
             const pageData = filteredInvoices.slice(start, end);
 
             tbody.innerHTML = pageData.map(inv => {
-                let agingDisplay;
-                if (inv.realAging !== null) {
-                    agingDisplay = inv.estimatedAging
-                        ? `<span title="앞뒤 인보이스 기준 추정값">${inv.realAging}<sup style="color:var(--ogk-cyan);font-size:9px;">추정</sup></span>`
-                        : `${inv.realAging}`;
-                } else {
-                    agingDisplay = `<span class="aging-unpaid">-</span>`;
-                }
+                const agingDisplay = inv.realAging !== null ? `${inv.realAging}` : `<span class="aging-unpaid">-</span>`;
 
                 let statusText = '';
-                if (inv.isPaid) {
+                if (inv.isOffset) {
+                    statusText = '<span style="color: #6366f1; font-size: 12px;">상계</span>';
+                } else if (inv.isPaid) {
                     statusText = '<span style="color: #15803d; font-size: 12px;">수금완료</span>';
                 } else if (inv.balance > 0) {
                     statusText = '<span style="color: #a16207; font-size: 12px;">미수금</span>';
